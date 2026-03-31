@@ -52,7 +52,8 @@ If you want the full experience with provider flexibility, go use [oh-my-openage
 ### As a Plugin
 
 ```bash
-/plugin install Whiskey-Tango-Foxtrot-GmbH/sisyclaude
+/plugin marketplace add Whiskey-Tango-Foxtrot-GmbH/sisyclaude
+/plugin install sisyclaude@sisyclaude
 ```
 
 ### Activate
