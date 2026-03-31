@@ -1,0 +1,8 @@
+{
+  "name": "sisyclaude",
+  "description": "Multi-agent orchestration for Claude Code, ported from oh-my-openagent. Greek mythology-themed agents for planning, execution, research, and review.",
+  "version": "2.1.0",
+  "author": {
+    "name": "Whiskey Tango Foxtrot GmbH"
+  }
+}
