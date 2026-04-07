@@ -11,7 +11,7 @@
       "name": "sisyclaude",
       "source": "./",
       "description": "Greek mythology-themed agents for planning, execution, research, and review.",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "repository": "https://github.com/Whiskey-Tango-Foxtrot-GmbH/sisyclaude",
       "license": "Sustainable Use License v1.0",
       "keywords": ["agents", "orchestration", "multi-agent", "planning"]
