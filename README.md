@@ -46,6 +46,15 @@ If you want the full experience with provider flexibility, go use [oh-my-openage
 | **Metis** | Pre-planning analyst — catches hidden requirements, AI slop | Opus | `@metis` |
 | **Explore** | Fast codebase search — structured results, parallel execution | Haiku | `@explore` |
 | **Librarian** | OSS docs researcher — evidence-based with GitHub permalinks | Sonnet | `@librarian` |
+| **Socrates** | Design critic — adversarial-constructive idea stress-testing | Opus | `@socrates` / `/brainstorm` |
+
+## Skills
+
+| Skill | What it does |
+|---|---|
+| `/brainstorm` | Spawns Socrates for interactive design challenge dialogue |
+| `/sisyclaude:activate` | Activates SisyClaude as default orchestrator |
+| `/sisyclaude:deactivate` | Deactivates SisyClaude, restores original CLAUDE.md |
 
 ## Installation
 
