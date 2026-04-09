@@ -71,6 +71,18 @@ If you want the full experience with provider flexibility, go use [oh-my-openage
 /sisyclaude:activate
 ```
 
+## Known Incompatibilities
+
+### `superpowers` plugin (`claude-plugins-official`)
+
+The `superpowers` plugin uses a `SessionStart` hook that injects instructions conflicting with SisyClaude's Phase 0 intent classification. Its aggressive framing (`EXTREMELY_IMPORTANT`, `ABSOLUTELY MUST`) overrides Sisyphus's measured, think-first approach, causing Claude to skip intent classification and jump straight to action.
+
+**Symptoms:** Claude ignores Phase 0, skips skill checks, applies workarounds instead of diagnosing root causes.
+
+**Fix:** `/sisyclaude:activate` detects the conflict and offers to disable the superpowers hooks automatically. If you installed superpowers after activating SisyClaude, re-run `/sisyclaude:activate`.
+
+See [#4](https://github.com/Whiskey-Tango-Foxtrot-GmbH/sisyclaude/issues/4) for details.
+
 ## Attribution & License
 
 The agent architecture, naming conventions, and design philosophy in this project are ported from [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) by [@code-yeongyu](https://github.com/code-yeongyu). Their work pioneered the multi-agent orchestration pattern for AI coding assistants, and this port would not exist without it.
