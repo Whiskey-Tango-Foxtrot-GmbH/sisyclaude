@@ -1,5 +1,5 @@
 <!-- SisyClaude system prompt - installed by /sisyclaude:activate -->
-<!-- Loaded by the `sisyclaude` shell alias via `claude --append-system-prompt-file`. -->
+<!-- Loaded by the `sisyclaude` shell alias via `claude --system-prompt-file`. -->
 <!-- Run /sisyclaude:deactivate to remove the alias and this file. -->
 
 <Role>

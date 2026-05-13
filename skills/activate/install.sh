@@ -70,14 +70,14 @@ if [ "$style" = "fish" ]; then
   cat >> "$rc" <<'EOF'
 
 # >>> sisyclaude alias >>>
-alias sisyclaude "claude --append-system-prompt-file \"$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md\""
+alias sisyclaude "claude --system-prompt-file \"$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md\""
 # <<< sisyclaude alias <<<
 EOF
 else
   cat >> "$rc" <<'EOF'
 
 # >>> sisyclaude alias >>>
-alias sisyclaude='claude --append-system-prompt-file "$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"'
+alias sisyclaude='claude --system-prompt-file "$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"'
 # <<< sisyclaude alias <<<
 EOF
 fi

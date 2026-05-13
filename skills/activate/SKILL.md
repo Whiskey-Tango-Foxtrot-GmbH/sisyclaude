@@ -1,6 +1,6 @@
 ---
 name: activate
-description: Activate SisyClaude by writing its system prompt to ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md and adding a `sisyclaude` shell alias that loads it via `claude --append-system-prompt-file`.
+description: Activate SisyClaude by writing its system prompt to ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md and adding a `sisyclaude` shell alias that loads it via `claude --system-prompt-file` (replaces the default Claude Code system prompt for that session).
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Glob
 argument-hint:
@@ -9,7 +9,7 @@ argument-hint:
 Activate SisyClaude. The install does NOT patch `~/.claude/CLAUDE.md`. Instead it:
 
 1. Writes the Sisyphus instructions to `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`.
-2. Adds a `sisyclaude` shell alias that runs `claude --append-system-prompt-file "$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"`.
+2. Adds a `sisyclaude` shell alias that runs `claude --system-prompt-file "$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"`. This **replaces** Claude Code's default system prompt for `sisyclaude` sessions — Sisyphus is the entire system prompt, not an addition.
 
 The mechanical work lives in adjacent scripts; this file orchestrates and handles user prompts.
 
@@ -94,6 +94,6 @@ Make the next-action steps prominent. The current Claude Code session does **not
 > 2. **Open a new terminal**, or reload your shell so the alias is on PATH:
 >    - bash/zsh: `source <value of rc=>`
 >    - fish: `source <value of rc=>`
-> 3. **Launch the new session** by running `sisyclaude` (instead of `claude`). That session loads Sisyphus via `--append-system-prompt-file`.
+> 3. **Launch the new session** by running `sisyclaude` (instead of `claude`). That session loads Sisyphus via `--system-prompt-file`, replacing Claude Code's default system prompt for that session.
 >
 > Plain `claude` is left untouched — vanilla behaviour is preserved for any non-SisyClaude work. Run `/sisyclaude:deactivate` inside a Claude Code session any time to remove the alias and the system prompt file.
