@@ -1,61 +1,63 @@
 ---
 name: deactivate
-description: Deactivate SisyClaude by restoring the user's original CLAUDE.md from backup.
+description: Deactivate SisyClaude by removing the `sisyclaude` shell alias and deleting ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md.
 user-invocable: true
-allowed-tools: Read, Bash
+allowed-tools: Read, Edit, Bash
 argument-hint:
 ---
 
-Deactivate SisyClaude and restore the user's original CLAUDE.md. Follow these steps:
+Deactivate SisyClaude. The uninstall:
 
-## Step 1: Verify SisyClaude is active
+1. Removes the `sisyclaude` alias block from every shell rc file that contains it.
+2. Deletes `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`.
 
-```bash
-grep -q "SisyClaude orchestrator - installed by /sisyclaude:activate" ~/.claude/CLAUDE.md 2>/dev/null && echo "ACTIVE" || echo "NOT_ACTIVE"
-```
+It does NOT touch `~/.claude/CLAUDE.md` (the new install does not patch it).
 
-If `NOT_ACTIVE`, tell the user SisyClaude is not currently activated and stop.
+The mechanical work lives in adjacent scripts; this file orchestrates and handles user prompts.
 
-## Step 2: Find the oldest backup (the original)
+| File | Purpose |
+|---|---|
+| `check.sh` | Diagnoses current state (prompt file, alias rc files, superpowers marker) |
+| `uninstall.sh` | Strips the alias block from every rc file and deletes the prompt file |
 
-Find the **oldest** backup — this is the user's original CLAUDE.md from before the first activation, not a backup of an already-activated state:
-
-```bash
-ls -t ~/.claude/CLAUDE.md.backup.* 2>/dev/null | tail -1
-```
-
-If no backup exists, tell the user there's nothing to restore — just delete `~/.claude/CLAUDE.md` if they want to remove SisyClaude.
-
-## Step 3: Restore the backup
+## Step 1: Read current state
 
 ```bash
-cp <oldest_backup> ~/.claude/CLAUDE.md
+bash "${CLAUDE_SKILL_DIR}/check.sh"
 ```
 
-## Step 4: Check for disabled superpowers plugin
+Parse the `key=value` output. Keys: `prompt_file`, `alias_in`, `superpowers_marker`.
 
-Check if SisyClaude previously disabled the superpowers plugin:
+If `prompt_file=absent` **and** `alias_in` is empty, SisyClaude is not currently activated. Tell the user and stop.
+
+If only one is present, continue — the uninstall script will clean up whatever remains.
+
+## Step 2: Run the uninstall
 
 ```bash
-test -f ~/.claude/.superpowers_disabled && echo "WAS_DISABLED" || echo "NOT_DISABLED"
+bash "${CLAUDE_SKILL_DIR}/uninstall.sh"
 ```
 
-If `WAS_DISABLED`, ask the user:
+Parse the output: `removed_from` (space-separated rc paths, possibly empty), `prompt_file` (`removed` or `already_absent`).
 
-> The `superpowers` plugin was disabled during SisyClaude activation. Would you like to re-enable it?
+The script uses `sed -i.bak` so each edited rc file gets a `<file>.bak` sibling in case the user wants to inspect or revert.
 
-If yes, the user will need to manually re-enable the superpowers hooks in their settings (since the exact hook configuration varies). Tell them where to look (`~/.claude/settings.json` or `.claude/settings.json`).
+## Step 3: Handle the superpowers marker
 
-Either way, clean up the marker:
+If `superpowers_marker=present` from Step 1, ask the user whether to re-enable `superpowers` hooks. The exact settings entry varies, so tell them to check `~/.claude/settings.json` or `.claude/settings.json` and restore the `SessionStart` hook manually.
+
+Then remove the marker:
 
 ```bash
 rm -f ~/.claude/.superpowers_disabled
 ```
 
-## Step 5: Confirm
+## Step 4: Confirm
 
 Tell the user:
-- Their original CLAUDE.md has been restored
-- The backup files are still there if they need them
-- Whether superpowers was re-enabled or still disabled
-- They can re-activate with `/sisyclaude:activate`
+
+- The `sisyclaude` alias was removed from `<list from removed_from>` (backups at `<file>.bak`). If the list was empty, say nothing was removed from any rc.
+- `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md` was deleted (or note it was already absent).
+- They must reload their shell (`source <rc file>` or open a new terminal) for the alias to disappear from the current session.
+- `~/.claude/CLAUDE.md` was not touched — this version of the skill never modified it.
+- Re-activate any time with `/sisyclaude:activate`.

@@ -1,97 +1,99 @@
 ---
 name: activate
-description: Activate SisyClaude as the default Claude Code orchestrator by injecting its instructions into the user's global CLAUDE.md. Backs up existing CLAUDE.md if present.
+description: Activate SisyClaude by writing its system prompt to ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md and adding a `sisyclaude` shell alias that loads it via `claude --append-system-prompt-file`.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Glob
 argument-hint:
 ---
 
-Activate SisyClaude as the default Claude Code orchestrator. Follow these steps exactly:
+Activate SisyClaude. The install does NOT patch `~/.claude/CLAUDE.md`. Instead it:
 
-## Step 1: Check if already activated
+1. Writes the Sisyphus instructions to `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`.
+2. Adds a `sisyclaude` shell alias that runs `claude --append-system-prompt-file "$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"`.
 
-Check if `~/.claude/CLAUDE.md` exists and already contains the SisyClaude marker:
+The mechanical work lives in adjacent scripts; this file orchestrates and handles user prompts.
 
-```bash
-grep -q "SisyClaude orchestrator - installed by /sisyclaude:activate" ~/.claude/CLAUDE.md 2>/dev/null && echo "ALREADY_ACTIVE" || echo "NOT_ACTIVE"
-```
+| File | Purpose |
+|---|---|
+| `check.sh` | Diagnoses current state (prompt file, alias, legacy install, superpowers) |
+| `restore-legacy.sh` | Restores the oldest `CLAUDE.md.backup.*` if a legacy install is present |
+| `install.sh` | Copies `system-prompt.md` to `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`, detects shell, appends alias |
+| `system-prompt.md` | The full Sisyphus system prompt (loaded at top level — Sisyphus is not a sub-agent, since the Agent tool cannot nest) |
 
-If `ALREADY_ACTIVE`, tell the user SisyClaude is already activated and stop. Do not back up or overwrite.
-
-## Step 2: Check for conflicting plugins
-
-Check if the `superpowers` plugin (from `claude-plugins-official`) is installed by looking for its SessionStart hook in settings:
-
-```bash
-grep -r "superpowers" ~/.claude/settings.json ~/.claude/settings.local.json 2>/dev/null | head -5
-```
-
-Also check if a `using-superpowers` skill or `superpowers` hook exists in the project-level settings:
+## Step 1: Read current state
 
 ```bash
-grep -r "superpowers" .claude/settings.json .claude/settings.local.json 2>/dev/null | head -5
+bash "${CLAUDE_SKILL_DIR}/check.sh"
 ```
 
-If **any match is found**, warn the user:
+Parse the `key=value` output. Keys: `prompt_file`, `alias_in`, `legacy_claude_md`, `superpowers`.
+
+If `prompt_file=present` **and** `alias_in` is non-empty, SisyClaude is already activated. Tell the user and stop. Mention `/sisyclaude:deactivate` to remove it.
+
+If only one of the two is present, continue — the install script is idempotent and will fill in whatever's missing.
+
+## Step 2: Offer to clean up a legacy install
+
+If `legacy_claude_md=present`, tell the user:
+
+> A legacy SisyClaude install is patched into `~/.claude/CLAUDE.md`. The new install does not touch that file. To avoid duplicate instructions, I can restore the oldest backup (`~/.claude/CLAUDE.md.backup.*`) to your CLAUDE.md before proceeding. Continue with restore? (recommended)
+
+If yes:
+
+```bash
+bash "${CLAUDE_SKILL_DIR}/restore-legacy.sh"
+```
+
+If the script prints `no_backup`, ask whether to delete `~/.claude/CLAUDE.md` outright or leave it as-is (duplicate instructions will be active during `sisyclaude` sessions but harmless).
+
+## Step 3: Handle superpowers conflict
+
+If `superpowers=present`, warn the user:
 
 > **Warning: Conflicting plugin detected.**
 >
-> The `superpowers` plugin (from `claude-plugins-official`) uses aggressive SessionStart hooks that override SisyClaude's Phase 0 intent classification. When both are active, Claude will skip the think-first, delegate-first behavior and jump straight to action.
+> The `superpowers` plugin uses aggressive `SessionStart` hooks that inject instructions overriding SisyClaude's Phase 0 intent classification. With both active inside a `sisyclaude` session, Claude may skip the think-first, delegate-first behavior.
 >
 > **Options:**
-> 1. **Disable superpowers hooks** (recommended) — I'll comment out the superpowers SessionStart hook in your settings so it doesn't inject conflicting instructions. You can re-enable it with `/sisyclaude:deactivate`.
-> 2. **Continue anyway** — Keep both active, but expect degraded SisyClaude behavior.
-> 3. **Abort** — Stop activation.
+> 1. **Disable superpowers hooks** (recommended) — comment out the `SessionStart` hook entries referencing `superpowers`. Re-enable manually after `/sisyclaude:deactivate`.
+> 2. **Continue anyway** — keep both active, expect degraded behavior.
+> 3. **Abort** — stop activation.
 
-If the user chooses option 1, disable the superpowers SessionStart hook by reading the relevant settings file (global or project), removing or commenting out the hook entry that references `superpowers`, and writing the file back. Also create a marker file so deactivation knows to restore it:
+If option 1, remove or comment out the superpowers `SessionStart` hook entries in the relevant settings file, then mark it so deactivation knows:
 
 ```bash
 echo "disabled_by_sisyclaude" > ~/.claude/.superpowers_disabled
 ```
 
-If the user chooses option 3, stop. Do not proceed with activation.
+If option 3, stop.
 
-## Step 3: Check for existing CLAUDE.md
-
-```bash
-test -f ~/.claude/CLAUDE.md && echo "EXISTS" || echo "NOT_FOUND"
-```
-
-## Step 4: Backup if it exists
-
-If the file exists, create a timestamped backup:
+## Step 4: Run the install
 
 ```bash
-cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.backup.$(date +%Y%m%d_%H%M%S)
+bash "${CLAUDE_SKILL_DIR}/install.sh"
 ```
 
-Tell the user the backup path.
+Parse the output keys: `wrote`, `shell`, `rc`, `style`, `alias_status`.
 
-## Step 5: Read the Sisyphus agent definition
+If the script exits non-zero or prints an `ERROR:` line on stderr, surface it to the user and stop — do not pretend the install succeeded.
 
-Read the sisyphus agent file from the plugin:
+If `shell=unknown` (i.e. `$SHELL` was unrecognised and the script fell back to `~/.profile`), tell the user what shell was detected and ask if `~/.profile` is correct or if they want a different rc file. If different, do the alias append manually using the same marker block style.
 
-```
-${CLAUDE_SKILL_DIR}/../../agents/sisyphus.md
-```
+## Step 5: Confirm — and tell the user what to do NEXT
 
-## Step 6: Write CLAUDE.md
+Make the next-action steps prominent. The current Claude Code session does **not** pick up the new alias or system prompt — Sisyphus only takes effect in a fresh `sisyclaude` session. Spell this out:
 
-Create `~/.claude/CLAUDE.md` with the sisyphus agent content, but:
-- **Strip the YAML frontmatter** (the `---` block with name, description, tools, model, color)
-- **Keep everything else** (all the behavioral instructions from `<Role>` onward)
-- **Prepend a header comment** so the user knows where it came from:
-
-```markdown
-<!-- SisyClaude orchestrator - installed by /sisyclaude:activate -->
-<!-- Original CLAUDE.md backed up. Run /sisyclaude:deactivate to restore. -->
-```
-
-If the user already had content in their CLAUDE.md that they want to preserve (non-sisyclaude content), append a section break and the original content below the sisyphus instructions so nothing is lost.
-
-## Step 7: Confirm
-
-Tell the user:
-- SisyClaude is now the default orchestrator
-- Where the backup is (if one was made)
-- They can restore their original with `/sisyclaude:deactivate`
+> **Install complete.**
+>
+> - System prompt written to `<value of wrote=>`.
+> - Alias `sisyclaude` was `<added | already present>` in `<value of rc=>`.
+>
+> **Next steps — do these now to activate Sisyphus:**
+>
+> 1. **Exit this Claude Code session** (`/exit`, Ctrl-D, or close the window). The current session was started with plain `claude`, so the new alias and system prompt are not loaded here.
+> 2. **Open a new terminal**, or reload your shell so the alias is on PATH:
+>    - bash/zsh: `source <value of rc=>`
+>    - fish: `source <value of rc=>`
+> 3. **Launch the new session** by running `sisyclaude` (instead of `claude`). That session loads Sisyphus via `--append-system-prompt-file`.
+>
+> Plain `claude` is left untouched — vanilla behaviour is preserved for any non-SisyClaude work. Run `/sisyclaude:deactivate` inside a Claude Code session any time to remove the alias and the system prompt file.

@@ -33,11 +33,14 @@ The name "SisyClaude" is intentional — this is a reduced, Claude-specific adap
 
 If you want the full experience with provider flexibility, go use [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent). This port is for people who prefer (or need) to stay within Claude Code and want better orchestration than the vanilla experience.
 
+## Top-Level Orchestrator
+
+**Sisyphus** — Main orchestrator: classifies intent, delegates to specialists, verifies results. Runs at the top level (not a sub-agent, because the `Agent` tool cannot nest) and is loaded into Claude Code via the `sisyclaude` shell alias added by `/sisyclaude:activate`. Run `sisyclaude` instead of `claude` to start a session with Sisyphus's instructions in effect.
+
 ## Agents
 
 | Agent | Role | Model | Invocation |
 |---|---|---|---|
-| **Sisyphus** | Main orchestrator — classifies intent, delegates, verifies | Opus | `@sisyphus` |
 | **Atlas** | Plan executor — delegates ALL implementation, never codes | Opus | `@atlas` |
 | **Hephaestus** | Autonomous deep worker — never asks, just completes | Opus | `@hephaestus` |
 | **Prometheus** | Strategic planner — interviews, researches, writes plans | Opus | `@prometheus` |

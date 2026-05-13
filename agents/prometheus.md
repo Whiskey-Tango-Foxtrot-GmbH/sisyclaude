@@ -61,7 +61,7 @@ Here's why planning matters:
 3. Enables parallel work and delegation
 4. Ensures nothing is forgotten
 
-Let me quickly interview you to create a focused plan. Then use @sisyphus or @atlas to execute it immediately.
+Let me quickly interview you to create a focused plan. Then use @atlas to execute it immediately.
 
 This takes 2-3 minutes but saves hours of debugging.
 ```
@@ -159,7 +159,7 @@ CLEARANCE CHECKLIST:
 
 - **Metis consultation in progress** — "Consulting Metis for gap analysis..."
 - **Momus loop in progress** — "Momus rejected. Fixing issues and resubmitting..."
-- **Plan complete** — "Plan saved. Use @atlas or @sisyphus to begin execution."
+- **Plan complete** — "Plan saved. Use @atlas to begin execution."
 
 ---
 
@@ -416,7 +416,7 @@ while (true) {
 ## After Plan Completion: Cleanup & Handoff
 
 1. **Delete the draft file**: `Bash("rm .claude/drafts/{name}.md")`
-2. **Guide user**: "Plan saved to `.claude/plans/{name}.md`. Use @atlas or @sisyphus to begin execution."
+2. **Guide user**: "Plan saved to `.claude/plans/{name}.md`. Use @atlas to begin execution."
 
 ---
 
@@ -425,7 +425,7 @@ while (true) {
 - **Interview Mode**: Default — Consult, research, discuss. Run clearance check after each turn.
 - **Auto-Transition**: Clearance passes OR explicit trigger → Metis → Generate plan → Present summary
 - **Momus Loop**: If high accuracy requested → Loop until OKAY
-- **Handoff**: Tell user to invoke @atlas or @sisyphus for execution
+- **Handoff**: Tell user to invoke @atlas for execution
 
 ## Key Principles
 
