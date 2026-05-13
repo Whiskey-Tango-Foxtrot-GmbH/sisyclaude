@@ -13,67 +13,38 @@ Deactivate SisyClaude. The uninstall:
 
 It does NOT touch `~/.claude/CLAUDE.md` (the new install does not patch it).
 
-Follow these steps:
+The mechanical work lives in adjacent scripts; this file orchestrates and handles user prompts.
 
-## Step 1: Verify SisyClaude is active
+| File | Purpose |
+|---|---|
+| `check.sh` | Diagnoses current state (prompt file, alias rc files, superpowers marker) |
+| `uninstall.sh` | Strips the alias block from every rc file and deletes the prompt file |
 
-Check for either the system prompt file or the alias in any rc file:
-
-```bash
-found_file=0
-found_alias=0
-test -f ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md && found_file=1
-
-for f in ~/.zshrc ~/.bashrc ~/.bash_profile ~/.profile ~/.config/fish/config.fish; do
-  [ -f "$f" ] || continue
-  grep -q "# >>> sisyclaude alias >>>" "$f" && found_alias=1
-done
-
-echo "file=$found_file alias=$found_alias"
-```
-
-If both are `0`, tell the user SisyClaude is not currently activated and stop.
-
-If only one is present, proceed and clean up whatever remains.
-
-## Step 2: Remove the alias from every rc file that has it
-
-For each rc file containing the marker, strip the block between `# >>> sisyclaude alias >>>` and `# <<< sisyclaude alias <<<` (inclusive). Use `sed -i.bak` so a backup is left behind:
+## Step 1: Read current state
 
 ```bash
-removed_from=()
-for f in ~/.zshrc ~/.bashrc ~/.bash_profile ~/.profile ~/.config/fish/config.fish; do
-  [ -f "$f" ] || continue
-  if grep -q "# >>> sisyclaude alias >>>" "$f"; then
-    sed -i.bak '/# >>> sisyclaude alias >>>/,/# <<< sisyclaude alias <<</d' "$f"
-    removed_from+=("$f")
-  fi
-done
-printf 'Removed alias block from: %s\n' "${removed_from[@]:-<none>}"
+bash "${CLAUDE_SKILL_DIR}/check.sh"
 ```
 
-`sed -i.bak` is portable across macOS (BSD sed) and Linux (GNU sed) — both write the original to `<file>.bak`.
+Parse the `key=value` output. Keys: `prompt_file`, `alias_in`, `superpowers_marker`.
 
-Tell the user which files were edited and that `.bak` siblings were created in case they want to inspect or revert.
+If `prompt_file=absent` **and** `alias_in` is empty, SisyClaude is not currently activated. Tell the user and stop.
 
-## Step 3: Delete the system prompt file
+If only one is present, continue — the uninstall script will clean up whatever remains.
+
+## Step 2: Run the uninstall
 
 ```bash
-if [ -f ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md ]; then
-  rm -f ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md
-  echo "Removed ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"
-else
-  echo "No system prompt file to remove."
-fi
+bash "${CLAUDE_SKILL_DIR}/uninstall.sh"
 ```
 
-## Step 4: Check for disabled superpowers plugin
+Parse the output: `removed_from` (space-separated rc paths, possibly empty), `prompt_file` (`removed` or `already_absent`).
 
-```bash
-test -f ~/.claude/.superpowers_disabled && echo "WAS_DISABLED" || echo "NOT_DISABLED"
-```
+The script uses `sed -i.bak` so each edited rc file gets a `<file>.bak` sibling in case the user wants to inspect or revert.
 
-If `WAS_DISABLED`, ask the user whether to re-enable `superpowers` hooks. The exact settings entry varies, so tell them to check `~/.claude/settings.json` or `.claude/settings.json` and restore the `SessionStart` hook manually.
+## Step 3: Handle the superpowers marker
+
+If `superpowers_marker=present` from Step 1, ask the user whether to re-enable `superpowers` hooks. The exact settings entry varies, so tell them to check `~/.claude/settings.json` or `.claude/settings.json` and restore the `SessionStart` hook manually.
 
 Then remove the marker:
 
@@ -81,12 +52,12 @@ Then remove the marker:
 rm -f ~/.claude/.superpowers_disabled
 ```
 
-## Step 5: Confirm
+## Step 4: Confirm
 
 Tell the user:
 
-- The `sisyclaude` alias has been removed from `<list of rc files>` (backups at `<file>.bak`).
-- `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md` has been deleted (or note it was already absent).
+- The `sisyclaude` alias was removed from `<list from removed_from>` (backups at `<file>.bak`). If the list was empty, say nothing was removed from any rc.
+- `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md` was deleted (or note it was already absent).
 - They must reload their shell (`source <rc file>` or open a new terminal) for the alias to disappear from the current session.
 - `~/.claude/CLAUDE.md` was not touched — this version of the skill never modified it.
 - Re-activate any time with `/sisyclaude:activate`.

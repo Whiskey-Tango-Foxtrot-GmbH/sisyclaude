@@ -11,55 +11,44 @@ Activate SisyClaude. The install does NOT patch `~/.claude/CLAUDE.md`. Instead i
 1. Writes the Sisyphus instructions to `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`.
 2. Adds a `sisyclaude` shell alias that runs `claude --append-system-prompt-file "$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"`.
 
-Follow these steps exactly.
+The mechanical work lives in adjacent scripts; this file orchestrates and handles user prompts.
 
-## Step 1: Check if already activated
+| File | Purpose |
+|---|---|
+| `check.sh` | Diagnoses current state (prompt file, alias, legacy install, superpowers) |
+| `restore-legacy.sh` | Restores the oldest `CLAUDE.md.backup.*` if a legacy install is present |
+| `install.sh` | Copies `system-prompt.md` to `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`, detects shell, appends alias |
+| `system-prompt.md` | The full Sisyphus system prompt (loaded at top level — Sisyphus is not a sub-agent, since the Agent tool cannot nest) |
 
-```bash
-test -f ~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md && echo "FILE_PRESENT" || echo "FILE_MISSING"
-```
-
-Then check the rc files for an existing alias block:
-
-```bash
-for f in ~/.zshrc ~/.bashrc ~/.bash_profile ~/.config/fish/config.fish; do
-  [ -f "$f" ] && grep -q "# >>> sisyclaude alias >>>" "$f" && echo "ALIAS_IN $f"
-done
-```
-
-If both the system prompt file exists AND the alias is present in at least one rc file, tell the user SisyClaude is already activated and stop. Mention `/sisyclaude:deactivate` to remove it.
-
-If only one of the two is present, proceed — the missing piece will be added in the steps below.
-
-## Step 2: Detect and offer to clean up legacy install
-
-Older versions of this skill patched `~/.claude/CLAUDE.md` directly. Detect and offer to clean up:
+## Step 1: Read current state
 
 ```bash
-grep -qE "Sisy(phus|Claude) orchestrator - installed by /sisy(phus|claude):activate" ~/.claude/CLAUDE.md 2>/dev/null && echo "LEGACY_PRESENT" || echo "NO_LEGACY"
+bash "${CLAUDE_SKILL_DIR}/check.sh"
 ```
 
-If `LEGACY_PRESENT`, tell the user:
+Parse the `key=value` output. Keys: `prompt_file`, `alias_in`, `legacy_claude_md`, `superpowers`.
+
+If `prompt_file=present` **and** `alias_in` is non-empty, SisyClaude is already activated. Tell the user and stop. Mention `/sisyclaude:deactivate` to remove it.
+
+If only one of the two is present, continue — the install script is idempotent and will fill in whatever's missing.
+
+## Step 2: Offer to clean up a legacy install
+
+If `legacy_claude_md=present`, tell the user:
 
 > A legacy SisyClaude install is patched into `~/.claude/CLAUDE.md`. The new install does not touch that file. To avoid duplicate instructions, I can restore the oldest backup (`~/.claude/CLAUDE.md.backup.*`) to your CLAUDE.md before proceeding. Continue with restore? (recommended)
 
-If the user agrees, find the oldest backup and restore it:
+If yes:
 
 ```bash
-oldest=$(ls -t ~/.claude/CLAUDE.md.backup.* 2>/dev/null | tail -1)
-[ -n "$oldest" ] && cp "$oldest" ~/.claude/CLAUDE.md && echo "Restored from $oldest"
+bash "${CLAUDE_SKILL_DIR}/restore-legacy.sh"
 ```
 
-If no backup exists, ask whether to delete `~/.claude/CLAUDE.md` outright or leave it as-is (duplicate instructions will be active during `sisyclaude` sessions but harmless).
+If the script prints `no_backup`, ask whether to delete `~/.claude/CLAUDE.md` outright or leave it as-is (duplicate instructions will be active during `sisyclaude` sessions but harmless).
 
-## Step 3: Check for conflicting plugins (superpowers)
+## Step 3: Handle superpowers conflict
 
-```bash
-grep -r "superpowers" ~/.claude/settings.json ~/.claude/settings.local.json 2>/dev/null | head -5
-grep -r "superpowers" .claude/settings.json .claude/settings.local.json 2>/dev/null | head -5
-```
-
-If any match is found, warn the user:
+If `superpowers=present`, warn the user:
 
 > **Warning: Conflicting plugin detected.**
 >
@@ -70,7 +59,7 @@ If any match is found, warn the user:
 > 2. **Continue anyway** — keep both active, expect degraded behavior.
 > 3. **Abort** — stop activation.
 
-If option 1, remove or comment out the superpowers `SessionStart` hook entries in the relevant settings file, then mark it:
+If option 1, remove or comment out the superpowers `SessionStart` hook entries in the relevant settings file, then mark it so deactivation knows:
 
 ```bash
 echo "disabled_by_sisyclaude" > ~/.claude/.superpowers_disabled
@@ -78,104 +67,33 @@ echo "disabled_by_sisyclaude" > ~/.claude/.superpowers_disabled
 
 If option 3, stop.
 
-## Step 4: Build the system prompt content
-
-Read the sisyphus agent file from the plugin:
-
-```
-${CLAUDE_SKILL_DIR}/../../agents/sisyphus.md
-```
-
-Strip the YAML frontmatter (the leading `---` block with name/description/tools/model/color). Keep everything from `<Role>` onward.
-
-Prepend this header so the source is obvious:
-
-```markdown
-<!-- SisyClaude system prompt - installed by /sisyclaude:activate -->
-<!-- Loaded by the `sisyclaude` shell alias via `claude --append-system-prompt-file`. -->
-<!-- Run /sisyclaude:deactivate to remove the alias and this file. -->
-```
-
-## Step 5: Write the system prompt file
-
-Write the combined content to `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`. Overwrite if present (the legacy-cleanup step above already handled CLAUDE.md).
-
-## Step 6: Detect the user's shell and pick the rc file
-
-Use `$SHELL` to detect, fall back to checking `~/.zshrc`/`~/.bashrc` presence:
+## Step 4: Run the install
 
 ```bash
-shell_name=$(basename "${SHELL:-}")
-uname_s=$(uname -s)
-
-case "$shell_name" in
-  zsh)
-    rc="$HOME/.zshrc"
-    style="posix"
-    ;;
-  bash)
-    # macOS bash conventionally uses .bash_profile for login shells.
-    if [ "$uname_s" = "Darwin" ] && [ -f "$HOME/.bash_profile" ]; then
-      rc="$HOME/.bash_profile"
-    elif [ -f "$HOME/.bashrc" ]; then
-      rc="$HOME/.bashrc"
-    elif [ "$uname_s" = "Darwin" ]; then
-      rc="$HOME/.bash_profile"
-    else
-      rc="$HOME/.bashrc"
-    fi
-    style="posix"
-    ;;
-  fish)
-    rc="$HOME/.config/fish/config.fish"
-    mkdir -p "$(dirname "$rc")"
-    style="fish"
-    ;;
-  *)
-    # Unknown shell — ask the user which rc file to edit, or default to ~/.profile.
-    rc="$HOME/.profile"
-    style="posix"
-    ;;
-esac
-
-echo "shell=$shell_name rc=$rc style=$style"
+bash "${CLAUDE_SKILL_DIR}/install.sh"
 ```
 
-If the detected shell is unknown, tell the user what was detected and ask whether to write to `~/.profile` or a path they specify.
+Parse the output keys: `wrote`, `shell`, `rc`, `style`, `alias_status`.
 
-## Step 7: Append the alias block
+If the script exits non-zero or prints an `ERROR:` line on stderr, surface it to the user and stop — do not pretend the install succeeded.
 
-Skip if the markers already exist in the chosen rc file:
+If `shell=unknown` (i.e. `$SHELL` was unrecognised and the script fell back to `~/.profile`), tell the user what shell was detected and ask if `~/.profile` is correct or if they want a different rc file. If different, do the alias append manually using the same marker block style.
 
-```bash
-grep -q "# >>> sisyclaude alias >>>" "$rc" 2>/dev/null && echo "ALREADY_HAS_ALIAS" || echo "NEEDS_ALIAS"
-```
+## Step 5: Confirm — and tell the user what to do NEXT
 
-For POSIX shells (bash, zsh), append:
+Make the next-action steps prominent. The current Claude Code session does **not** pick up the new alias or system prompt — Sisyphus only takes effect in a fresh `sisyclaude` session. Spell this out:
 
-```
-# >>> sisyclaude alias >>>
-alias sisyclaude='claude --append-system-prompt-file "$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md"'
-# <<< sisyclaude alias <<<
-```
-
-For fish, append (note fish's alias syntax — space-separated, double-quoted):
-
-```
-# >>> sisyclaude alias >>>
-alias sisyclaude "claude --append-system-prompt-file \"$HOME/.claude/SISYCLAUDE_SYSTEM_PROMPT.md\""
-# <<< sisyclaude alias <<<
-```
-
-Use `printf '...\n' >> "$rc"` or the Write tool to append — do NOT overwrite.
-
-## Step 8: Confirm
-
-Tell the user:
-
-- System prompt written to `~/.claude/SISYCLAUDE_SYSTEM_PROMPT.md`.
-- Alias `sisyclaude` added to `<rc file path>`.
-- They must reload their shell to use it: `source <rc file>` (or open a new terminal; fish users: `source <rc file>` works too).
-- Usage: run `sisyclaude` instead of `claude` to launch a session with the SisyClaude orchestrator instructions pre-loaded.
-- Plain `claude` is untouched — vanilla behavior is preserved.
-- Run `/sisyclaude:deactivate` (inside a Claude Code session) to remove the alias and the system prompt file.
+> **Install complete.**
+>
+> - System prompt written to `<value of wrote=>`.
+> - Alias `sisyclaude` was `<added | already present>` in `<value of rc=>`.
+>
+> **Next steps — do these now to activate Sisyphus:**
+>
+> 1. **Exit this Claude Code session** (`/exit`, Ctrl-D, or close the window). The current session was started with plain `claude`, so the new alias and system prompt are not loaded here.
+> 2. **Open a new terminal**, or reload your shell so the alias is on PATH:
+>    - bash/zsh: `source <value of rc=>`
+>    - fish: `source <value of rc=>`
+> 3. **Launch the new session** by running `sisyclaude` (instead of `claude`). That session loads Sisyphus via `--append-system-prompt-file`.
+>
+> Plain `claude` is left untouched — vanilla behaviour is preserved for any non-SisyClaude work. Run `/sisyclaude:deactivate` inside a Claude Code session any time to remove the alias and the system prompt file.
